@@ -1,8 +1,8 @@
 {
     "required": true,
-    "package": "io.github.tobyrue.btc.mixin",
+    "package": "io.github.tobyrue.btc.mixin.client",
     "compatibilityLevel": "JAVA_21",
-    "mixins": [],
+    "client": [],
     "injectors": {
         "defaultRequire": 1
     }

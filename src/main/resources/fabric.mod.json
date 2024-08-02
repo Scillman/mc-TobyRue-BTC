@@ -1,32 +1,38 @@
 {
-  "schemaVersion": 1,
-  "id": "btc",
-  "version": "${version}",
-  "name": "BTC",
-  "description": "",
-  "authors": [
-    "TobinOakenshield"
-  ],
-  "contact": {
-    "repo": "https://github.com/TobyRue/BTC"
-  },
-  "license": "MIT",
-  "icon": "assets/btc/icon.png",
-  "environment": "*",
-  "entrypoints": {
-    "client": [
-      "io.github.tobyrue.btc.client.BTCClient"
+    "schemaVersion": 1,
+    "id": "btc",
+    "version": "${version}",
+    "name": "BTC",
+    "description": "",
+    "authors": [
+        "Scillman",
+        "TobinOakenshield"
     ],
-    "main": [
-      "io.github.tobyrue.btc.BTC"
-    ]
-  },
-  "mixins": [
-    "btc.mixins.json"
-  ],
-  "depends": {
-    "fabricloader": ">=${loader_version}",
-    "fabric": "*",
-    "minecraft": "${minecraft_version}"
-  }
+    "contact": {
+        "repo": "https://github.com/TobyRue/BTC"
+    },
+    "license": "MIT",
+    "icon": "assets/btc/icon.png",
+    "environment": "*",
+    "entrypoints": {
+        "main": [
+            "io.github.tobyrue.btc.BTC"
+        ],
+        "client": [
+            "io.github.tobyrue.btc.client.BTCClient"
+        ]
+    },
+    "mixins": [
+        "btc.mixins.json",
+        {
+            "config": "btc.client.mixins.json",
+            "environment": "client"
+        }
+    ],
+    "depends": {
+        "fabricloader": ">=${loader_version}",
+        "minecraft": "${minecraft_version}",
+        "java": ">=${java_version}",
+        "fabric-api": "*"
+    }
 }

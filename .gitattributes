@@ -1,0 +1,19 @@
+* text=auto
+
+# Linux
+/gradlew        text eol=lf
+
+# Windows
+*.bat           text eol=crlf
+
+# Common
+*.gradle        text eol=crlf
+*.java          text eol=crlf
+*.json          text eol=lf
+*.md            text eol=crlf
+*.properties    text eol=crlf
+*.yml           text eol=crlf
+
+# Binary
+*.jar           binary
+*.png           binary
