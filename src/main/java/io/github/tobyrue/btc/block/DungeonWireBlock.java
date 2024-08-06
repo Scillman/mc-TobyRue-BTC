@@ -5,13 +5,10 @@ import org.jetbrains.annotations.Nullable;
 
 import com.mojang.serialization.MapCodec;
 
-import io.github.tobyrue.btc.BTC;
-import io.github.tobyrue.btc.RootWhere;
+import io.github.tobyrue.btc.state.property.ConnectionProperty;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
-import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.item.ItemStack;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.BooleanProperty;
 import net.minecraft.state.property.DirectionProperty;
@@ -19,22 +16,24 @@ import net.minecraft.state.property.EnumProperty;
 import net.minecraft.state.property.Properties;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
+import net.minecraft.world.BlockView;
 import net.minecraft.world.World;
 
 public class DungeonWireBlock extends Block
 {
     public static final MapCodec<DungeonWireBlock> CODEC = createCodec(DungeonWireBlock::new);
 
-    public static final EnumProperty<RootWhere> ROOT_WHERE = EnumProperty.of("root_where", RootWhere.class);
-    public static final BooleanProperty FACING_DOWN = BooleanProperty.of("facing_down");
-    public static final BooleanProperty FACING_UP = BooleanProperty.of("facing_up");
-    public static final BooleanProperty FACING_LEFT = BooleanProperty.of("facing_left");
-    public static final BooleanProperty FACING_RIGHT = BooleanProperty.of("facing_right");
-    public static final BooleanProperty POWERED = BooleanProperty.of("powered");
-    public static final BooleanProperty ROOT = BooleanProperty.of("root");
-    public static final BooleanProperty MAIN = BooleanProperty.of("main");
-    public static final BooleanProperty CONNECTED_MAIN = BooleanProperty.of("connected_main");
     public static final DirectionProperty FACING = Properties.FACING;
+
+    public static final BooleanProperty FACING_UP = BooleanProperty.of("up");
+    public static final BooleanProperty FACING_DOWN = BooleanProperty.of("down");
+    public static final BooleanProperty FACING_LEFT = BooleanProperty.of("left");
+    public static final BooleanProperty FACING_RIGHT = BooleanProperty.of("right");
+
+    public static final BooleanProperty ROOT = BooleanProperty.of("root");
+    public static final EnumProperty<ConnectionProperty> CONNECTION = EnumProperty.of("connection", ConnectionProperty.class);
+
+    public static final BooleanProperty POWERED = BooleanProperty.of("powered");
 
     public DungeonWireBlock(Settings settings)
     {
@@ -47,10 +46,9 @@ public class DungeonWireBlock extends Block
             .with(FACING_LEFT, false)
             .with(FACING, Direction.NORTH)
             .with(ROOT, false)
-            .with(MAIN, false)
-            .with(CONNECTED_MAIN, false)
-            .with(ROOT_WHERE, RootWhere.NONE)
-            .with(POWERED, false));
+            .with(CONNECTION, ConnectionProperty.NONE)
+            .with(POWERED, false)
+        );
     }
 
     @Override
@@ -59,373 +57,312 @@ public class DungeonWireBlock extends Block
         return CODEC;
     }
 
+    /**
+     * Get the initial block state of the block when first placed.
+     * @brief ctx The placement context.
+     * @return The block state for the block to be placed.
+     */
     @Override
     @Nullable
     public BlockState getPlacementState(ItemPlacementContext ctx)
     {
-        // TODO: facing_X based on FACING
+        World world = ctx.getWorld();
+        BlockPos blockPos = ctx.getBlockPos();
 
-        return this.getDefaultState()
-            .with(FACING_DOWN, false)
-            .with(FACING_UP, false)
-            .with(FACING_LEFT, false)
-            .with(FACING_RIGHT, false)
-            .with(ROOT, false)
-            .with(MAIN, false)
-            .with(CONNECTED_MAIN, false)
-            .with(ROOT_WHERE, RootWhere.NONE)
-            .with(POWERED, ctx.getWorld().isReceivingRedstonePower(ctx.getBlockPos()))
-            .with(FACING, ctx.getSide().getOpposite().getOpposite());
+        BlockState placementState = this.getDefaultState()
+            .with(FACING, ctx.getSide());
+
+        placementState = updateFacingState(placementState, world, blockPos);
+
+        ConnectionProperty parent = findConnectionParent(placementState, world, blockPos);
+        placementState = placementState.with(CONNECTION, parent);
+
+        placementState = updatePowered(placementState, world, blockPos);
+
+        return placementState;
     }
 
+    /**
+     * Adds all the properties of the block.
+     * @builder The block state builder to add the properties to.
+     */
     @Override
     protected void appendProperties(StateManager.Builder<Block, BlockState> builder)
     {
         builder.add(
-            CONNECTED_MAIN,
+            CONNECTION,
             FACING_DOWN,
             FACING_LEFT,
             FACING_RIGHT,
             FACING_UP,
             FACING,
-            MAIN,
             POWERED,
-            ROOT_WHERE,
             ROOT
         );
     }
 
-    @Override
-    public void neighborUpdate(BlockState state, World world, BlockPos pos, Block block, BlockPos fromPos, boolean notify)
+    /**
+     *
+     * @param blockState
+     * @param world
+     * @param blockPos
+     * @return
+    */
+    private BlockState updateFacingState(BlockState blockState, World world, BlockPos blockPos)
     {
-        super.neighborUpdate(state, world, pos, block, fromPos, notify);
+        boolean up    = world.getBlockState(blockPos.offset(Direction.UP)).isOf(this);
+        boolean down  = world.getBlockState(blockPos.offset(Direction.DOWN)).isOf(this);
+        boolean north = world.getBlockState(blockPos.offset(Direction.NORTH)).isOf(this);
+        boolean east  = world.getBlockState(blockPos.offset(Direction.EAST)).isOf(this);
+        boolean south = world.getBlockState(blockPos.offset(Direction.SOUTH)).isOf(this);
+        boolean west  = world.getBlockState(blockPos.offset(Direction.WEST)).isOf(this);
 
-        if (!world.isClient)
+        if (!up && !down && !north && !east && !south && !west)
         {
-            updateStateBasedOnNeighbors(state, world, pos);
+            return blockState;
+        }
+
+        Direction facing = blockState.get(FACING);
+
+        if (facing == Direction.UP)
+        {
+            return blockState
+                .with(FACING_UP, south)
+                .with(FACING_DOWN, north)
+                .with(FACING_LEFT, east)
+                .with(FACING_RIGHT, west);
+        }
+        else if (facing == Direction.DOWN)
+        {
+            return blockState
+                .with(FACING_UP, north)
+                .with(FACING_DOWN, south)
+                .with(FACING_LEFT, east)
+                .with(FACING_RIGHT, west);
+        }
+        else if (facing == Direction.NORTH)
+        {
+            return blockState
+                .with(FACING_UP, up)
+                .with(FACING_DOWN, down)
+                .with(FACING_LEFT, east)
+                .with(FACING_RIGHT, west);
+        }
+        else if (facing == Direction.EAST)
+        {
+            return blockState
+                .with(FACING_UP, up)
+                .with(FACING_DOWN, down)
+                .with(FACING_LEFT, south)
+                .with(FACING_RIGHT, north);
+        }
+        else if (facing == Direction.SOUTH)
+        {
+            return blockState
+                .with(FACING_UP, up)
+                .with(FACING_DOWN, down)
+                .with(FACING_LEFT, west)
+                .with(FACING_RIGHT, east);
+        }
+        else
+        {
+            assert(facing == Direction.WEST);
+
+            return blockState
+                .with(FACING_UP, up)
+                .with(FACING_DOWN, down)
+                .with(FACING_LEFT, north)
+                .with(FACING_RIGHT, south);
         }
     }
 
-    @Override
-    public void onPlaced(World world, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack itemStack)
+    /**
+     *
+     * @param blockState
+     * @param world
+     * @param blockPos
+     * @return
+     * @remarks Only finds blocks of the same class.
+     */
+    private ConnectionProperty findConnectionParent(BlockState blockState, World world, BlockPos blockPos)
     {
-        super.onPlaced(world, pos, state, placer, itemStack);
+        ConnectionProperty poweredTarget = ConnectionProperty.NONE;
+        ConnectionProperty unpoweredTarget = ConnectionProperty.NONE;
+
+        for (Direction direction: Direction.values())
+        {
+            BlockState other = world.getBlockState(blockPos.offset(direction));
+            if (!other.isOf(this))
+            {
+                continue;
+            }
+
+            if (other.get(ROOT))
+            {
+                return ConnectionProperty.of(direction);
+            }
+
+            ConnectionProperty parent = other.get(CONNECTION);
+            if (other.get(CONNECTION) != ConnectionProperty.NONE)
+            {
+                if (parent.asDirection().getOpposite() == direction)
+                {
+                    continue;
+                }
+
+                if (other.get(POWERED))
+                {
+                    if (poweredTarget == ConnectionProperty.NONE)
+                    {
+                        poweredTarget = ConnectionProperty.of(direction);
+                    }
+                }
+                else
+                {
+                    if (unpoweredTarget == ConnectionProperty.NONE)
+                    {
+                        unpoweredTarget = ConnectionProperty.of(direction);
+                    }
+                }
+            }
+        }
+
+        if (poweredTarget != ConnectionProperty.NONE)
+        {
+            return poweredTarget;
+        }
+
+        if (unpoweredTarget != ConnectionProperty.NONE)
+        {
+            return unpoweredTarget;
+        }
+
+        return ConnectionProperty.NONE;
+    }
+
+    /**
+     *
+     * @param blockState
+     * @param world
+     * @param blockPos
+     * @return
+     */
+    private boolean isValidConnectionParent(BlockState blockState, World world, BlockPos blockPos)
+    {
+        ConnectionProperty parent = blockState.get(CONNECTION);
+        if (parent != ConnectionProperty.NONE)
+        {
+            BlockState other = world.getBlockState(blockPos.offset(parent.asDirection()));
+            if (other.isOf(this) && other.get(CONNECTION) != ConnectionProperty.NONE)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     *
+     * @param blockState
+     * @param world
+     * @param blockPos
+     * @return
+     */
+    private BlockState updateConnectionParent(BlockState blockState, World world, BlockPos blockPos)
+    {
+        if (isValidConnectionParent(blockState, world, blockPos))
+        {
+            return blockState;
+        }
+
+        ConnectionProperty parent = findConnectionParent(blockState, world, blockPos);
+        return blockState.with(CONNECTION, parent);
+    }
+
+    /**
+     *
+     * @param blockState
+     * @param world
+     * @param blockPos
+     * @return
+     */
+    private BlockState updatePowered(BlockState blockState, World world, BlockPos blockPos)
+    {
+        if (blockState.get(ROOT))
+        {
+            return blockState.with(POWERED, true);
+        }
+
+        if (blockState.get(CONNECTION) != ConnectionProperty.NONE)
+        {
+            ConnectionProperty parent = blockState.get(CONNECTION);
+            BlockState other = world.getBlockState(blockPos.offset(parent.asDirection()));
+            if (other.isOf(this) && other.get(POWERED))
+            {
+                return blockState.with(POWERED, true);
+            }
+
+            return blockState.with(POWERED, false);
+        }
+
+        return blockState.with(POWERED, false);
+    }
+
+    /**
+     * Called when a neighbor update notify has been received.
+     * @param blockState The block state of this block.
+     * @param world The world the block is located in.
+     * @param blockPos The position of the block inside the world.
+     * @param sourceBlock The block that send the neighbor update notify.
+     * @param sourcePos The position of the block that send the notify.
+     * @param notify
+     * @remarks onStateReplaced -> neighborUpdate
+     * @remarks getPlacementState -> neighborUpdate -> onPlaced
+     */
+    @Override
+    public void neighborUpdate(BlockState blockState, World world, BlockPos blockPos, Block sourceBlock, BlockPos sourcePos, boolean notify)
+    {
+        super.neighborUpdate(blockState, world, blockPos, sourceBlock, sourcePos, notify);
 
         if (!world.isClient)
         {
-            updateStateBasedOnNeighbors(state, world, pos);
+            BlockState newState = blockState;
+            newState = updateFacingState(newState, world, blockPos);
+            newState = updateConnectionParent(newState, world, blockPos);
+            newState = updatePowered(newState, world, blockPos);
+
+            if (!blockState.equals(newState))
+            {
+                world.setBlockState(blockPos, newState, (NOTIFY_NEIGHBORS | NOTIFY_LISTENERS));
+            }
         }
     }
 
-    private void updateStateBasedOnNeighbors(BlockState state, World world, BlockPos pos)
+    /**
+     * Returns whether the block is capable of emitting a redstone signal.
+     */
+    @Override
+    protected boolean emitsRedstonePower(BlockState state)
     {
-        boolean facingDown = false;
-        boolean facingUp = false;
-        boolean facingLeft = false;
-        boolean facingRight = false;
-        boolean powered = false;
-        boolean connectedMain = false;
-        RootWhere rootWhere = RootWhere.NONE; // Default or initial value
-        boolean tempPowered = false;
+        return true;
+    }
 
-        for (Direction direction : Direction.values())
-        {
-            BlockPos neighborPos = pos.offset(direction);
-            BlockState neighborState = world.getBlockState(neighborPos);
+    /**
+     * The weak redstone signal strength.
+     * @remarks Weak cannot pass through blocks. For example Redstone Dust cannot but a Repeater can.
+     */
+    @Override
+    protected int getWeakRedstonePower(BlockState state, BlockView world, BlockPos pos, Direction direction)
+    {
+        return state.get(POWERED) ? 15 : 0;
+    }
 
-            // if main is powered set powered to true if not powered false maybe fix????
-
-
-            // If any neighbor is powered, set the flag to true
-
-            if (state.get(ROOT))
-            {
-                tempPowered = true; // ROOT is true, so POWERED must be true
-                System.out.println("Root Powered," + state.get(POWERED));
-                world.updateNeighbors(pos, this);
-            }
-
-/*
-            if (!state.get(POWERED) && state.get(ROOT))
-            {
-                powered = false;
-                System.out.println("Root UnPowered");
-            }
-*/
-
-            if (neighborState.getBlock() instanceof DungeonWireBlock)
-            {
-                connectedMain = (neighborState.get(MAIN) || neighborState.get(CONNECTED_MAIN));
-                BTC.LOGGER.info("{} {}",
-                    (connectedMain ? "connected" : "disconnected"),
-                    pos
-                );
-
-                if (!neighborState.get(CONNECTED_MAIN))
-                {
-                    tempPowered = false;
-                }
-
-                if (state.get(CONNECTED_MAIN))
-                {
-                    tempPowered = neighborState.get(POWERED);
-                    BTC.LOGGER.info("{} {}",
-                        (tempPowered ? "powering" : "unpowering"),
-                        pos
-                    );
-                }
-
-                if (state.get(MAIN))
-                {
-                    tempPowered = neighborState.get(ROOT);
-                }
-
-//                if (state.get(CONNECTED_MAIN) && !state.get(MAIN) && neighborState.get(POWERED))
-//                {
-//                    System.out.println("powering" + pos);
-//                    tempPowered = true;
-//                }
-//                if (!neighborState.get(POWERED))
-//                {
-//                    tempPowered = false;
-//                }
-
-                if (state.get(MAIN))
-                {
-                    if (direction == Direction.UP)
-                    {
-                        if (neighborState.get(ROOT) || neighborState.get(ROOT_WHERE) == RootWhere.UP)
-                        {
-                            rootWhere = RootWhere.UP;
-                        }
-                    }
-                    else if (direction == Direction.DOWN)
-                    {
-                        if (neighborState.get(ROOT) || neighborState.get(ROOT_WHERE) == RootWhere.DOWN)
-                        {
-                            rootWhere = RootWhere.DOWN;
-                        }
-                    }
-                    else if (direction == Direction.NORTH)
-                    {
-                        if (neighborState.get(ROOT) || neighborState.get(ROOT_WHERE) == RootWhere.NORTH)
-                        {
-                            rootWhere = RootWhere.NORTH;
-                        }
-                    }
-                    else if (direction == Direction.EAST)
-                    {
-                        if (neighborState.get(ROOT) || neighborState.get(ROOT_WHERE) == RootWhere.EAST)
-                        {
-                            rootWhere = RootWhere.EAST;
-                        }
-                    }
-                    else if (direction == Direction.SOUTH)
-                    {
-                        if (neighborState.get(ROOT) || neighborState.get(ROOT_WHERE) == RootWhere.SOUTH)
-                        {
-                            rootWhere = RootWhere.SOUTH;
-                        }
-                    }
-                    else if (direction == Direction.WEST)
-                    {
-                        if (neighborState.get(ROOT) || neighborState.get(ROOT_WHERE) == RootWhere.WEST)
-                        {
-                            rootWhere = RootWhere.WEST;
-                        }
-                    }
-                }
-            }
-
-            if ((neighborState.getBlock() instanceof DungeonWireBlock))
-            {
-                if (direction == Direction.UP)
-                {
-                    if (state.get(ROOT_WHERE) == RootWhere.UP)
-                    {
-                        tempPowered = true;
-                    }
-                }
-                else if (direction == Direction.DOWN)
-                {
-                    if (state.get(ROOT_WHERE) == RootWhere.DOWN)
-                    {
-                        tempPowered = true;
-                    }
-                }
-                else if (direction == Direction.NORTH)
-                {
-                    if (state.get(ROOT_WHERE) == RootWhere.NORTH)
-                    {
-                        tempPowered = true;
-                    }
-                }
-                else if (direction == Direction.EAST)
-                {
-                    if (state.get(ROOT_WHERE) == RootWhere.EAST)
-                    {
-                        tempPowered = true;
-                    }
-                }
-                else if (direction == Direction.SOUTH)
-                {
-                    if (state.get(ROOT_WHERE) == RootWhere.SOUTH)
-                    {
-                        tempPowered = true;
-                    }
-                }
-                else if (direction == Direction.WEST)
-                {
-                    if (state.get(ROOT_WHERE) == RootWhere.WEST)
-                    {
-                        tempPowered = true;
-                    }
-                }
-            }
-            else
-            {
-                if (direction == Direction.UP)
-                {
-                    if (state.get(ROOT_WHERE) == RootWhere.UP)
-                    {
-                        tempPowered = false;
-                    }
-                }
-                else if (direction == Direction.DOWN)
-                {
-                    if (state.get(ROOT_WHERE) == RootWhere.DOWN)
-                    {
-                        tempPowered = false;
-                    }
-                }
-                else if (direction == Direction.NORTH)
-                {
-                    if (state.get(ROOT_WHERE) == RootWhere.NORTH)
-                    {
-                        tempPowered = false;
-                    }
-                }
-                else if (direction == Direction.EAST)
-                {
-                    if (state.get(ROOT_WHERE) == RootWhere.EAST)
-                    {
-                        tempPowered = false;
-                    }
-                }
-                else if (direction == Direction.SOUTH)
-                {
-                    if (state.get(ROOT_WHERE) == RootWhere.SOUTH)
-                    {
-                        tempPowered = false;
-                    }
-                }
-                else if (direction == Direction.WEST)
-                {
-                    if (state.get(ROOT_WHERE) == RootWhere.WEST)
-                    {
-                        tempPowered = false;
-                    }
-                }
-            }
-
-            if (neighborState.getBlock() instanceof DungeonWireBlock)
-            {
-                if (state.get(FACING) == Direction.UP)
-                {
-                    switch (direction)
-                    {
-                        case UP:                        break;
-                        case DOWN:                      break;
-                        case NORTH: facingDown  = true; break;
-                        case EAST:  facingLeft  = true; break;
-                        case SOUTH: facingUp    = true; break;
-                        case WEST:  facingRight = true; break;
-                        default:
-                            break;
-                    }
-                }
-                else if (state.get(FACING) == Direction.DOWN)
-                {
-                    switch (direction)
-                    {
-                        case UP:                        break;
-                        case DOWN:                      break;
-                        case NORTH: facingUp    = true; break;
-                        case EAST:  facingLeft  = true; break;
-                        case SOUTH: facingDown  = true; break;
-                        case WEST:  facingRight = true; break;
-                        default:
-                            break;
-                    }
-                }
-                else if (state.get(FACING) == Direction.NORTH)
-                {
-                    switch (direction)
-                    {
-                        case UP:    facingUp    = true; break;
-                        case DOWN:  facingDown  = true; break;
-                        case NORTH:                     break;
-                        case EAST:  facingLeft  = true; break;
-                        case SOUTH:                     break;
-                        case WEST:  facingRight = true; break;
-                        default:
-                            break;
-                    }
-                }
-                else if (state.get(FACING) == Direction.EAST)
-                {
-                    switch (direction) {
-                        case UP:    facingUp    = true; break;
-                        case DOWN:  facingDown  = true; break;
-                        case NORTH: facingRight = true; break;
-                        case EAST:                      break;
-                        case SOUTH: facingLeft  = true; break;
-                        case WEST:                      break;
-                        default:
-                            break;
-                    }
-                }
-                else if (state.get(FACING) == Direction.SOUTH)
-                {
-                    switch (direction)
-                    {
-                        case UP:    facingUp    = true; break;
-                        case DOWN:  facingDown  = true; break;
-                        case NORTH:                     break;
-                        case EAST:  facingRight = true; break;
-                        case SOUTH:                     break;
-                        case WEST:  facingLeft  = true; break;
-                        default:
-                            break;
-                    }
-                }
-                else if (state.get(FACING) == Direction.WEST)
-                {
-                    switch (direction)
-                    {
-                        case UP:    facingUp    = true; break;
-                        case DOWN:  facingDown  = true; break;
-                        case NORTH: facingLeft  = true; break;
-                        case EAST:                      break;
-                        case SOUTH: facingRight = true; break;
-                        case WEST:                      break;
-                        default:
-                            break;
-                    }
-                }
-            }
-        }
-        powered = tempPowered;
-
-        BlockState newState = state
-            .with(FACING_DOWN, facingDown)
-            .with(FACING_UP, facingUp)
-            .with(FACING_LEFT, facingLeft)
-            .with(FACING_RIGHT, facingRight)
-            .with(ROOT_WHERE, rootWhere)
-            .with(CONNECTED_MAIN, connectedMain)
-            .with(POWERED, powered);
-
-        world.setBlockState(pos, newState, NOTIFY_ALL_AND_REDRAW);
+    /**
+     * The strong redstone signal strength.
+     */
+    protected int getStrongRedstonePower(BlockState state, BlockView world, BlockPos pos, Direction direction)
+    {
+        return getWeakRedstonePower(state, world, pos, direction);
     }
 }

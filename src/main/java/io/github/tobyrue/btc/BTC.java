@@ -19,15 +19,6 @@ public class BTC implements ModInitializer
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_NAME);
 
     /**
-     * Prints text to the system output stream.
-     * @param args Arguments that need to be printed to the system output stream.
-     */
-    public static void println(Object... args)
-    {
-        System.out.println(String.join(" ", java.util.Arrays.stream(args).map(Object::toString).toArray(String[]::new)));
-    }
-
-    /**
      * Called by the Fabric Loader. (e.g. mod entry point)
      */
     @Override

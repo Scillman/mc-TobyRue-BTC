@@ -15,6 +15,9 @@
     "icon": "assets/btc/icon.png",
     "environment": "*",
     "entrypoints": {
+        "fabric-datagen": [
+            "io.github.tobyrue.btc.datagen.BTCDataGenerator"
+        ],
         "main": [
             "io.github.tobyrue.btc.BTC"
         ],

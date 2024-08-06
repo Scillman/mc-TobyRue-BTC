@@ -1,3 +1,5 @@
+![BeeInfo](https://github.com/Scillman/mc-TobyRue-BTC/actions/workflows/build.yml/badge.svg?branch=fixme&event=push)
+
 # Description
 BTC is my first mod and it adds a new structure and a staff item that will be updated in the future to make uses for.
 When this mod is finished and able to be downloaded I do recommend https://www.curseforge.com/minecraft/mc-mods/novaultlimit

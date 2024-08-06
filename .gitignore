@@ -119,3 +119,6 @@ run/
 
 # VSCode
 .vscode/
+
+# Fabric
+generated/

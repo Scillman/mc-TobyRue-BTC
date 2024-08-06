@@ -5,25 +5,33 @@ import net.minecraft.util.math.Direction;
 
 public enum RootWhere implements StringIdentifiable
 {
-    NONE("none"),
-    UP("up"),
-    DOWN("down"),
-    NORTH("north"),
-    SOUTH("south"),
-    WEST("west"),
-    EAST("east");
+    NONE("none", Direction.UP),
+    UP("up", Direction.UP),
+    DOWN("down", Direction.DOWN),
+    NORTH("north", Direction.NORTH),
+    SOUTH("south", Direction.SOUTH),
+    WEST("west", Direction.WEST),
+    EAST("east", Direction.EAST);
 
     private final String name;
+    private final Direction direction;
 
-    private RootWhere(String name)
+    private RootWhere(String name, Direction direction)
     {
         this.name = name;
+        this.direction = direction;
     }
 
     @Override
     public String asString()
     {
         return this.name;
+    }
+
+    public Direction toDirection()
+    {
+        assert(this != RootWhere.NONE);
+        return this.direction;
     }
 
     public static RootWhere of(Direction direction)
