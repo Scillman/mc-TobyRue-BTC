@@ -1,11 +1,11 @@
-package io.github.tobyrue.btc.state.property;
+package io.github.tobyrue.btc;
 
 import java.util.Optional;
 
 import net.minecraft.util.StringIdentifiable;
 import net.minecraft.util.math.Direction;
 
-public enum ConnectionProperty implements StringIdentifiable
+public enum Connection implements StringIdentifiable
 {
     NONE("none"),
     UP("up", Direction.UP),
@@ -18,13 +18,13 @@ public enum ConnectionProperty implements StringIdentifiable
     private final String name;
     private final Optional<Direction> direction;
 
-    private ConnectionProperty(String name)
+    private Connection(String name)
     {
         this.name = name;
         this.direction = Optional.empty();
     }
 
-    private ConnectionProperty(String name, Direction direction)
+    private Connection(String name, Direction direction)
     {
         this.name = name;
         this.direction = Optional.of(direction);
@@ -42,9 +42,9 @@ public enum ConnectionProperty implements StringIdentifiable
         return this.direction.get();
     }
 
-    public static ConnectionProperty of(Direction direction)
+    public static Connection of(Direction direction)
     {
-        for (ConnectionProperty value: ConnectionProperty.values())
+        for (Connection value: Connection.values())
         {
             if (value.direction.isPresent() && value.direction.get() == direction)
             {
@@ -52,6 +52,6 @@ public enum ConnectionProperty implements StringIdentifiable
             }
         }
 
-        return ConnectionProperty.NONE;
+        return Connection.NONE;
     }
 }

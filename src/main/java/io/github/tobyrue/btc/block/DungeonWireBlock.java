@@ -5,7 +5,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.mojang.serialization.MapCodec;
 
-import io.github.tobyrue.btc.state.property.ConnectionProperty;
+import io.github.tobyrue.btc.Connection;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.item.ItemPlacementContext;
@@ -31,7 +31,7 @@ public class DungeonWireBlock extends Block
     public static final BooleanProperty FACING_RIGHT = BooleanProperty.of("right");
 
     public static final BooleanProperty ROOT = BooleanProperty.of("root");
-    public static final EnumProperty<ConnectionProperty> CONNECTION = EnumProperty.of("connection", ConnectionProperty.class);
+    public static final EnumProperty<Connection> CONNECTION = EnumProperty.of("connection", Connection.class);
 
     public static final BooleanProperty POWERED = BooleanProperty.of("powered");
 
@@ -46,7 +46,7 @@ public class DungeonWireBlock extends Block
             .with(FACING_LEFT, false)
             .with(FACING, Direction.NORTH)
             .with(ROOT, false)
-            .with(CONNECTION, ConnectionProperty.NONE)
+            .with(CONNECTION, Connection.NONE)
             .with(POWERED, false)
         );
     }
@@ -74,7 +74,7 @@ public class DungeonWireBlock extends Block
 
         placementState = updateFacingState(placementState, world, blockPos);
 
-        ConnectionProperty parent = findConnectionParent(placementState, world, blockPos);
+        Connection parent = findConnectionParent(placementState, world, blockPos);
         placementState = placementState.with(CONNECTION, parent);
 
         placementState = updatePowered(placementState, world, blockPos);
@@ -184,10 +184,10 @@ public class DungeonWireBlock extends Block
      * @return
      * @remarks Only finds blocks of the same class.
      */
-    private ConnectionProperty findConnectionParent(BlockState blockState, World world, BlockPos blockPos)
+    private Connection findConnectionParent(BlockState blockState, World world, BlockPos blockPos)
     {
-        ConnectionProperty poweredTarget = ConnectionProperty.NONE;
-        ConnectionProperty unpoweredTarget = ConnectionProperty.NONE;
+        Connection poweredTarget = Connection.NONE;
+        Connection unpoweredTarget = Connection.NONE;
 
         for (Direction direction: Direction.values())
         {
@@ -199,11 +199,11 @@ public class DungeonWireBlock extends Block
 
             if (other.get(ROOT))
             {
-                return ConnectionProperty.of(direction);
+                return Connection.of(direction);
             }
 
-            ConnectionProperty parent = other.get(CONNECTION);
-            if (other.get(CONNECTION) != ConnectionProperty.NONE)
+            Connection parent = other.get(CONNECTION);
+            if (other.get(CONNECTION) != Connection.NONE)
             {
                 if (parent.asDirection().getOpposite() == direction)
                 {
@@ -212,32 +212,32 @@ public class DungeonWireBlock extends Block
 
                 if (other.get(POWERED))
                 {
-                    if (poweredTarget == ConnectionProperty.NONE)
+                    if (poweredTarget == Connection.NONE)
                     {
-                        poweredTarget = ConnectionProperty.of(direction);
+                        poweredTarget = Connection.of(direction);
                     }
                 }
                 else
                 {
-                    if (unpoweredTarget == ConnectionProperty.NONE)
+                    if (unpoweredTarget == Connection.NONE)
                     {
-                        unpoweredTarget = ConnectionProperty.of(direction);
+                        unpoweredTarget = Connection.of(direction);
                     }
                 }
             }
         }
 
-        if (poweredTarget != ConnectionProperty.NONE)
+        if (poweredTarget != Connection.NONE)
         {
             return poweredTarget;
         }
 
-        if (unpoweredTarget != ConnectionProperty.NONE)
+        if (unpoweredTarget != Connection.NONE)
         {
             return unpoweredTarget;
         }
 
-        return ConnectionProperty.NONE;
+        return Connection.NONE;
     }
 
     /**
@@ -249,11 +249,11 @@ public class DungeonWireBlock extends Block
      */
     private boolean isValidConnectionParent(BlockState blockState, World world, BlockPos blockPos)
     {
-        ConnectionProperty parent = blockState.get(CONNECTION);
-        if (parent != ConnectionProperty.NONE)
+        Connection parent = blockState.get(CONNECTION);
+        if (parent != Connection.NONE)
         {
             BlockState other = world.getBlockState(blockPos.offset(parent.asDirection()));
-            if (other.isOf(this) && other.get(CONNECTION) != ConnectionProperty.NONE)
+            if (other.isOf(this) && other.get(CONNECTION) != Connection.NONE)
             {
                 return true;
             }
@@ -276,7 +276,7 @@ public class DungeonWireBlock extends Block
             return blockState;
         }
 
-        ConnectionProperty parent = findConnectionParent(blockState, world, blockPos);
+        Connection parent = findConnectionParent(blockState, world, blockPos);
         return blockState.with(CONNECTION, parent);
     }
 
@@ -294,9 +294,9 @@ public class DungeonWireBlock extends Block
             return blockState.with(POWERED, true);
         }
 
-        if (blockState.get(CONNECTION) != ConnectionProperty.NONE)
+        if (blockState.get(CONNECTION) != Connection.NONE)
         {
-            ConnectionProperty parent = blockState.get(CONNECTION);
+            Connection parent = blockState.get(CONNECTION);
             BlockState other = world.getBlockState(blockPos.offset(parent.asDirection()));
             if (other.isOf(this) && other.get(POWERED))
             {
