@@ -203,7 +203,7 @@ public class DungeonWireBlock extends Block
             }
 
             Connection parent = other.get(CONNECTION);
-            if (other.get(CONNECTION) != Connection.NONE)
+            if (parent != Connection.NONE)
             {
                 if (parent.asDirection().getOpposite() == direction)
                 {
@@ -294,16 +294,16 @@ public class DungeonWireBlock extends Block
             return blockState.with(POWERED, true);
         }
 
-        if (blockState.get(CONNECTION) != Connection.NONE)
+        if (blockState.get(CONNECTION) == Connection.NONE)
         {
-            Connection parent = blockState.get(CONNECTION);
-            BlockState other = world.getBlockState(blockPos.offset(parent.asDirection()));
-            if (other.isOf(this) && other.get(POWERED))
-            {
-                return blockState.with(POWERED, true);
-            }
-
             return blockState.with(POWERED, false);
+        }
+
+        Connection parent = blockState.get(CONNECTION);
+        BlockState other = world.getBlockState(blockPos.offset(parent.asDirection()));
+        if (other.isOf(this) && other.get(POWERED))
+        {
+            return blockState.with(POWERED, true);
         }
 
         return blockState.with(POWERED, false);
